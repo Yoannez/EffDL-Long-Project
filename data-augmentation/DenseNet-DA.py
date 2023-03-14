@@ -177,7 +177,7 @@ def test(epoch):
             'acc': acc,
             'epoch': epoch,
             'train loss': train_loss_plot,
-            'train acc': train_acc_plot,
+            'train acc': train_acc_plotD,
             'test loss': test_loss_plot,
             'test acc': test_acc_plot,
             'lr values': lr_values_plot
