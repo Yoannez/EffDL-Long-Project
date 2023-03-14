@@ -13,11 +13,8 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import os
 import argparse
-from models import *
+from densenetQat import *
 from utils import  * 
-from torch.ao.quantization import QConfigMapping
-import torch.ao.quantization.quantize_fx as quantize_fx
-import copy
 
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
@@ -76,9 +73,9 @@ test_loss_plot = []
 lr_values_plot = []
 
 net = net.to(device)
-if device == 'cuda':
+""" if device == 'cuda':
     net = torch.nn.DataParallel(net)
-    cudnn.benchmark = True
+    cudnn.benchmark = True """
 
 if args.resume:
     # Load checkpoint.
@@ -100,18 +97,7 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
-net_to_quantize = copy.deepcopy(net)
-qconfig_mapping = QConfigMapping().set_global(torch.quantization.get_default_qconfig('qnnpack'))
-net_to_quantize.eval()
-
-net_prepared = quantize_fx.prepare_fx(net_to_quantize, qconfig_mapping, trainloader)
-
-net_quantized = quantize_fx.convert_fx(net_prepared)
-print_size_of_model(net)
-print_size_of_model(net_quantized)
-
-
-
+net.fuse_model()
 
 
 """ 
