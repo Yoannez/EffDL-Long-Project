@@ -34,7 +34,7 @@ normalize_scratch = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.19
 # Here, Data augmentation (RandomCrop and Horizontal Flip) are applied to each batch, differently at each epoch, on the training set data only
 transform_train = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
+    #transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     normalize_scratch,
 ])
@@ -45,7 +45,7 @@ transform_test = transforms.Compose([
 ])
 
 ### The data from CIFAR10 will be downloaded in the following folder
-rootdir = './data/cifar10'
+rootdir = './../data/cifar10'
 
 c10train = CIFAR10(rootdir,train=True,download=True,transform=transform_train)
 c10test = CIFAR10(rootdir,train=False,download=True,transform=transform_test)
@@ -160,7 +160,7 @@ def test(epoch):
             'test acc': test_acc_plot,
             'lr values': lr_values_plot
         }
-        if not os.path.isdir('DN_Full'):
+        if not os.path.isdir('results/random-'):
             os.mkdir('DN_Full')
         torch.save(state, './DN_Full/ckpt.pth')
         best_acc = acc
