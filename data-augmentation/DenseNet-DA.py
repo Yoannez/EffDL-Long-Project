@@ -35,8 +35,8 @@ normalize_scratch = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.19
 # Transforms is a list of transformations applied on the 'raw' dataset before the data is fed to the network. 
 # Here, Data augmentation (RandomCrop and Horizontal Flip) are applied to each batch, differently at each epoch, on the training set data only
 transform_train = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
-    #transforms.RandomHorizontalFlip(),
+    #transforms.RandomCrop(32, padding=4),
+    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     normalize_scratch,
 ])
@@ -81,7 +81,7 @@ if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
     assert os.path.isdir('results'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./results/naive.pth')
+    checkpoint = torch.load('./results/random-crop/random-crop.pth')
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
@@ -91,6 +91,9 @@ if args.resume:
     test_loss_plot = checkpoint['test loss']
     lr_values_plot = checkpoint['lr values']
     print("Best Acc: ", best_acc)
+    plot_loss(train_loss_plot, test_loss_plot, 'loss.jpg')
+    plot_acc(train_acc_plot, test_acc_plot, 'acc.jpg')
+    plot_lr(lr_values_plot, 'lr.jpg')
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
@@ -162,19 +165,31 @@ def test(epoch):
             'test acc': test_acc_plot,
             'lr values': lr_values_plot
         }
-        if not os.path.isdir('results/random-crop'):
-            os.mkdir('results/random-crop')
-        torch.save(state, './results/random-crop/random-crop.pth')
+        if not os.path.isdir('results/random-flip'):
+            os.mkdir('results/random-flip')
+        torch.save(state, './results/random-flip/random-flip.pth')
         best_acc = acc
+    
+    if epoch == 199:
+        print('Finish..')
+        state = {
+            'net': net.state_dict(),
+            'acc': acc,
+            'epoch': epoch,
+            'train loss': train_loss_plot,
+            'train acc': train_acc_plot,
+            'test loss': test_loss_plot,
+            'test acc': test_acc_plot,
+            'lr values': lr_values_plot
+        }
+        if not os.path.isdir('results/random-flip'):
+            os.mkdir('results/random-flip')
+        torch.save(state, './results/random-flip/random-flip200.pth')
 
 
-
-for epoch in range(start_epoch, start_epoch+200):
+for epoch in range(start_epoch, 200):
     train(epoch)
     test(epoch)
     scheduler.step()
 
 
-plot_loss(train_loss_plot, test_loss_plot, 'loss.jpg')
-plot_acc(train_acc_plot, test_acc_plot, 'acc.jpg')
-plot_lr(lr_values_plot, 'lr.jpg')
