@@ -13,7 +13,7 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import os
 import argparse
-from densenetQat import *
+from Mymodels import *
 from utils import  * 
 
 
@@ -61,9 +61,9 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
     
 # Model
-print('==> Building DenseNet121 model..')
+print('==> Building densenet_cifar model..')
 
-net = DenseNet121()
+net = densenet_cifar()
 
 print("Number of parameters: ", count_parameters(net))
 train_acc_plot = []
@@ -73,15 +73,12 @@ test_loss_plot = []
 lr_values_plot = []
 
 net = net.to(device)
-""" if device == 'cuda':
-    net = torch.nn.DataParallel(net)
-    cudnn.benchmark = True """
 
 if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
-    assert os.path.isdir('DN_Full'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./../DN_Full/ckpt.pth')
+    assert os.path.isdir('./../results/densenet_cifar'), 'Error: no checkpoint directory found!'
+    checkpoint = torch.load('./../results/densenet_cifar/densenet_cifar.pth')
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
@@ -97,10 +94,10 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
-net.fuse_model()
 
 
-""" 
+
+
 
 
 # Training
@@ -138,7 +135,7 @@ def test(epoch):
     total = 0
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
-            inputs, targets = inputs.to(device), targets.to(device)
+            # inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
             loss = criterion(outputs, targets)
             test_loss += loss.item()
@@ -153,33 +150,40 @@ def test(epoch):
     test_loss_plot.append(test_loss/(batch_idx+1))
     lr_values_plot.append(scheduler.get_last_lr())
 
-    # Save checkpoint.
-    acc = 100.*correct/total
-    if acc > best_acc:
-        print('Saving..')
-        state = {
-            'net': net.state_dict(),
-            'acc': acc,
-            'epoch': epoch,
-            'train loss': train_loss_plot,
-            'train acc': train_acc_plot,
-            'test loss': test_loss_plot,
-            'test acc': test_acc_plot,
-            'lr values': lr_values_plot
-        }
-        if not os.path.isdir('DN_Full'):
-            os.mkdir('DN_Full')
-        torch.save(state, './DN_Full/ckpt.pth')
-        best_acc = acc
+    # # Save checkpoint.
+    # acc = 100.*correct/total
+    # if acc > best_acc:
+    #     print('Saving..')
+    #     state = {
+    #         'net': net.state_dict(),
+    #         'acc': acc,
+    #         'epoch': epoch,
+    #         'train loss': train_loss_plot,
+    #         'train acc': train_acc_plot,
+    #         'test loss': test_loss_plot,
+    #         'test acc': test_acc_plot,
+    #         'lr values': lr_values_plot
+    #     }
+    #     if not os.path.isdir('DN_Full'):
+    #         os.mkdir('DN_Full')
+    #     torch.save(state, './DN_Full/ckpt.pth')
+    #     best_acc = acc
 
+# for epoch in range(start_epoch, start_epoch+200):
+#     train(epoch)
+#     test(epoch)
+#     scheduler.step()
 
+net.eval()
 
-for epoch in range(start_epoch, start_epoch+200):
-    train(epoch)
-    test(epoch)
-    scheduler.step()
+net.fuse_model()
+print_size_of_model(net)
 
+net.qconfig = torch.quantization.default_qconfig
+torch.quantization.prepare(net, inplace=True)
 
-plot_loss(train_loss_plot, test_loss_plot, 'loss.jpg')
-plot_acc(train_acc_plot, test_acc_plot, 'acc.jpg')
-plot_lr(lr_values_plot, 'lr.jpg') """
+train(0)
+net.to('cpu')
+torch.quantization.convert(net, inplace=True)
+print_size_of_model(net)
+test(0)

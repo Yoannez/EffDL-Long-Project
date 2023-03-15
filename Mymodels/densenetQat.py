@@ -98,8 +98,7 @@ class DenseNet(nn.Module):
         for module in self.modules():
             if type(module) == Bottleneck:
                 torch.quantization.fuse_modules(module, ['conv1', 'bn2', 'relu2'], inplace=True)
-                print(module)
-                #torch.quantization.fuse_modules(module, ['conv2', 'bn2', 'relu2'], inplace=True)
+                
             
 
 def DenseNet121():
