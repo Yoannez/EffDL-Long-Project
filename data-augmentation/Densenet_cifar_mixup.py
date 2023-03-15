@@ -14,7 +14,7 @@ import torchvision
 import os
 import argparse
 from Mymodels import *
-from utils import progress_bar
+from utils import  * 
 from mix_up import *
 
 
@@ -56,12 +56,22 @@ c10test = CIFAR10(rootdir,train=False,download=True,transform=transform_test)
 trainloader = DataLoader(c10train,batch_size=32,shuffle=True)
 testloader = DataLoader(c10test,batch_size=32) 
 print(f"CIFAR10 dataset has {len(c10train)} samples")
-    
+
+# Count parameters
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+results_path = './../results/densenet_cifar_mixup/'
+result_name = 'densenet_cifar_mixup.pth'
+final_result_name = 'densenet_cifar_mixup200.pth'
+
 # Model
-print('==> Building DenseNet121 model..')
+print('==> Building densenet_cifar model..')
 
-net = DenseNet121()
+net = densenet_cifar()
 
+print("Number of parameters: ", count_parameters(net))
 train_acc_plot = []
 train_loss_plot = []
 test_acc_plot = []
@@ -69,9 +79,6 @@ test_loss_plot = []
 lr_values_plot = []
 
 net = net.to(device)
-if device == 'cuda':
-    net = torch.nn.DataParallel(net)
-    cudnn.benchmark = True
 
 if args.resume:
     # Load checkpoint.
@@ -91,7 +98,7 @@ if args.resume:
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=0.9, weight_decay=5e-4)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 mixup = True
 
 # Training
@@ -113,7 +120,7 @@ def train(epoch):
         train_loss += loss.item()
         _, predicted = outputs.max(1)
         total += targets.size(0)
-        correct += lam * predicted.eq(targets).sum().item() + (1-lam) * predicted.eq(tragets_prem).sum().item()
+        correct += predicted.eq(targets).sum().item()
 
         progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                      % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
@@ -159,11 +166,11 @@ def test(epoch):
             'test acc': test_acc_plot,
             'lr values': lr_values_plot
         }
-        if not os.path.isdir('results/mixup/begin0'):
-            os.mkdir('results/mixup/begin0')
-        torch.save(state, './results/mixup/begin0/mixup.pth')
+        if not os.path.isdir(results_path):
+            os.mkdir(results_path)
+        torch.save(state, results_path+result_name)
         best_acc = acc
-    
+
     if epoch == 199:
         print('Finish..')
         state = {
@@ -171,19 +178,18 @@ def test(epoch):
             'acc': acc,
             'epoch': epoch,
             'train loss': train_loss_plot,
-            'train acc': train_acc_plotD,
+            'train acc': train_acc_plot,
             'test loss': test_loss_plot,
             'test acc': test_acc_plot,
             'lr values': lr_values_plot
         }
-        if not os.path.isdir('results/mixup/begin0'):
-            os.mkdir('results/mixup/begin0')
-        torch.save(state, './results/mixup/begin0/mixup200.pth')
+        torch.save(state, results_path+final_result_name)
 
-
-
-for epoch in range(start_epoch, start_epoch+100):
+for epoch in range(start_epoch, 200):
     train(epoch)
     test(epoch)
     scheduler.step()
 
+plot_loss(train_loss_plot, test_loss_plot, results_path+'loss.jpg')
+plot_acc(train_acc_plot, test_acc_plot, results_path+'acc.jpg')
+plot_lr(lr_values_plot, results_path+'lr.jpg')
