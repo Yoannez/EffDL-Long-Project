@@ -35,7 +35,7 @@ normalize_scratch = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.19
 # Transforms is a list of transformations applied on the 'raw' dataset before the data is fed to the network. 
 # Here, Data augmentation (RandomCrop and Horizontal Flip) are applied to each batch, differently at each epoch, on the training set data only
 transform_train = transforms.Compose([
-    #transforms.RandomCrop(32, padding=4),
+    transforms.RandomCrop(32, padding=4),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     normalize_scratch,
@@ -81,7 +81,7 @@ if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
     assert os.path.isdir('results'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./results/random-crop/random-crop.pth')
+    checkpoint = torch.load('./results/random-flip/random-flip200.pth')
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
@@ -165,9 +165,9 @@ def test(epoch):
             'test acc': test_acc_plot,
             'lr values': lr_values_plot
         }
-        if not os.path.isdir('results/random-flip'):
-            os.mkdir('results/random-flip')
-        torch.save(state, './results/random-flip/random-flip.pth')
+        if not os.path.isdir('results/flip-crop'):
+            os.mkdir('results/flip-crop')
+        torch.save(state, './results/flip-crop/flip-crop.pth')
         best_acc = acc
     
     if epoch == 199:
@@ -182,9 +182,9 @@ def test(epoch):
             'test acc': test_acc_plot,
             'lr values': lr_values_plot
         }
-        if not os.path.isdir('results/random-flip'):
-            os.mkdir('results/random-flip')
-        torch.save(state, './results/random-flip/random-flip200.pth')
+        if not os.path.isdir('results/flip-crop'):
+            os.mkdir('results/flip-crop')
+        torch.save(state, './results/flip-crop/flip-crop200.pth')
 
 
 for epoch in range(start_epoch, 200):
