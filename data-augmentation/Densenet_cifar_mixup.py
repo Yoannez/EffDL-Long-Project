@@ -63,8 +63,10 @@ def count_parameters(model):
 
 
 results_path = './../results/densenet_cifar_mixup/'
+load_path = results_path
 result_name = 'densenet_cifar_mixup.pth'
 final_result_name = 'densenet_cifar_mixup200.pth'
+load_checkpoint = final_result_name
 
 # Model
 print('==> Building densenet_cifar model..')
@@ -83,8 +85,8 @@ net = net.to(device)
 if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
-    assert os.path.isdir('DN_Full'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./DN_Full/ckpt.pth')
+    assert os.path.isdir(load_path), 'Error: no checkpoint directory found!'
+    checkpoint = torch.load(load_path+load_checkpoint)
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
