@@ -66,7 +66,7 @@ results_path = './../results/densenet_cifar_NoDA/'
 load_path = results_path
 result_name = 'densenet_cifar_NoDA.pth'
 final_result_name = 'densenet_cifar_NoDA200.pth'
-load_checkpoint = result_name
+load_checkpoint = final_result_name
 
 # Model
 print('==> Building densenet_cifar model..')
@@ -96,6 +96,9 @@ if args.resume:
     test_loss_plot = checkpoint['test loss']
     lr_values_plot = checkpoint['lr values']
     print("Best Acc: ", best_acc)
+    plot_loss(train_loss_plot, test_loss_plot, results_path+'loss.jpg')
+    plot_acc(train_acc_plot, test_acc_plot, results_path+'acc.jpg')
+    plot_lr(lr_values_plot, results_path+'lr.jpg')
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
@@ -187,7 +190,7 @@ def test(epoch):
         }
         torch.save(state, results_path+final_result_name)
 
-for epoch in range(start_epoch, 300):
+for epoch in range(start_epoch, 200):
     train(epoch)
     test(epoch)
     scheduler.step()
