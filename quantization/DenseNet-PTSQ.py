@@ -74,11 +74,17 @@ lr_values_plot = []
 
 net = net.to(device)
 
+results_path = './../results/densenet_cifar_mixup_qint8/'
+load_path = './../results/densenet_cifar_mixup/'
+result_name = 'densenet_cifar_mixup_qint8x86.pth'
+final_result_name = 'densenet_cifar200.pth'
+load_checkpoint = 'densenet_cifar_mixup.pth'
+
 if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
-    assert os.path.isdir('./../results/densenet_cifar'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./../results/densenet_cifar/densenet_cifar.pth')
+    assert os.path.isdir(load_path), 'Error: no checkpoint directory found!'
+    checkpoint = torch.load(load_path+load_checkpoint)
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
@@ -94,12 +100,6 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
-
-
-
-
-
-
 # Training
 def train(epoch):
     print('\nEpoch: %d' % epoch)
@@ -108,7 +108,7 @@ def train(epoch):
     correct = 0
     total = 0
     for batch_idx, (inputs, targets) in enumerate(trainloader):
-        inputs, targets = inputs.to(device), targets.to(device)
+        inputs, targets = inputs.to('cpu'), targets.to('cpu')
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = criterion(outputs, targets)
@@ -150,24 +150,24 @@ def test(epoch):
     test_loss_plot.append(test_loss/(batch_idx+1))
     lr_values_plot.append(scheduler.get_last_lr())
 
-    # # Save checkpoint.
-    # acc = 100.*correct/total
-    # if acc > best_acc:
-    #     print('Saving..')
-    #     state = {
-    #         'net': net.state_dict(),
-    #         'acc': acc,
-    #         'epoch': epoch,
-    #         'train loss': train_loss_plot,
-    #         'train acc': train_acc_plot,
-    #         'test loss': test_loss_plot,
-    #         'test acc': test_acc_plot,
-    #         'lr values': lr_values_plot
-    #     }
-    #     if not os.path.isdir('DN_Full'):
-    #         os.mkdir('DN_Full')
-    #     torch.save(state, './DN_Full/ckpt.pth')
-    #     best_acc = acc
+    # Save checkpoint.
+    acc = 100.*correct/total
+    if acc > 94.57:
+        print('Saving..')
+        state = {
+            'net': net.state_dict(),
+            'acc': acc,
+            'epoch': epoch,
+            'train loss': train_loss_plot,
+            'train acc': train_acc_plot,
+            'test loss': test_loss_plot,
+            'test acc': test_acc_plot,
+            'lr values': lr_values_plot
+        }
+        if not os.path.isdir(results_path):
+            os.mkdir(results_path)
+        torch.save(state, results_path+result_name)
+        best_acc = acc
 
 # for epoch in range(start_epoch, start_epoch+200):
 #     train(epoch)
@@ -175,15 +175,16 @@ def test(epoch):
 #     scheduler.step()
 
 net.eval()
-
+net.to('cpu')
 net.fuse_model()
 print_size_of_model(net)
 
-net.qconfig = torch.quantization.default_qconfig
+net.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+print(net.qconfig)
+
 torch.quantization.prepare(net, inplace=True)
 
 train(0)
-net.to('cpu')
 torch.quantization.convert(net, inplace=True)
 print_size_of_model(net)
 test(0)
