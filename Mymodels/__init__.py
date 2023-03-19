@@ -1,3 +1,3 @@
 from .densenetQat import *
-from .pnasnet import *
+from .pnasnetQat import *
 
