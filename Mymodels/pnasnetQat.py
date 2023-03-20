@@ -5,6 +5,7 @@ Paper: Progressive Neural Architecture Search
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.quantization import QuantStub, DeQuantStub
 
 
 class SepConv(nn.Module):
@@ -56,7 +57,6 @@ class CellB(nn.Module):
         self.conv2 = nn.Conv2d(2*out_planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn2 = nn.BatchNorm2d(out_planes)
         self.relu2 = nn.ReLU(inplace = True)
-        
 
     def forward(self, x):
         # Left branch
@@ -68,14 +68,15 @@ class CellB(nn.Module):
             y3 = self.bn1(self.conv1(y3))
         y4 = self.sep_conv3(x)
         # Concat & reduce channels
-        b1 = self.relu_left((y1+y2))
-        b2 = self.relu_right((y3+y4))
-        y = FloatFunctional().cat([b1,b2], 1)
+        b1 = self.relu_left(nn.quantized.FloatFunctional().add(y1, y2))
+        b2 = self.relu_right(nn.quantized.FloatFunctional().add(y3, y4))
+        y = nn.quantized.FloatFunctional().cat(x=[b1,b2], dim=1)
         return self.relu2((self.bn2(self.conv2(y))))
 
 class PNASNet(nn.Module):
     def __init__(self, cell_type, num_cells, num_planes):
         super(PNASNet, self).__init__()
+        self.quant = QuantStub()
         self.in_planes = num_planes
         self.cell_type = cell_type
 
@@ -93,6 +94,8 @@ class PNASNet(nn.Module):
 
         self.linear = nn.Linear(num_planes*4, 10)
 
+        self.dequant = DeQuantStub()
+
     def _make_layer(self, planes, num_cells):
         layers = []
         for _ in range(num_cells):
@@ -106,7 +109,8 @@ class PNASNet(nn.Module):
         return layer
 
     def forward(self, x):
-        out = self.relu1(self.bn1(self.conv1(x)))
+        out = self.quant(x)
+        out = self.relu1(self.bn1(self.conv1(out)))
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
@@ -114,7 +118,19 @@ class PNASNet(nn.Module):
         out = self.layer5(out)
         out = self.avg_pool(out)
         out = self.linear(out.view(out.size(0), -1))
+        out = self.dequant(out)
         return out
+    
+    def fuse_model(self):
+        torch.quantization.fuse_modules(self, ['conv1', 'bn1', 'relu1'], inplace=True)
+        for module in self.modules():
+            if type(module) == CellB:
+                torch.quantization.fuse_modules(module, ['conv2', 'bn2', 'relu2'], inplace=True)
+                if module.stride == 2:
+                    torch.quantization.fuse_modules(module, ['conv1', 'bn1'], inplace=True)
+            if type(module) == SepConv:
+                torch.quantization.fuse_modules(module, ['conv1', 'bn1'], inplace=True)
+        
 
 
 def PNASNetA():
