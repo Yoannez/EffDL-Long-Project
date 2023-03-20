@@ -58,18 +58,11 @@ print(f"CIFAR10 dataset has {len(c10train)} samples")
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-
-results_path = './results/densenet_cifar/'
-load_path = results_path
-result_name = 'densenet_cifar.pth'
-final_result_name = 'densenet_cifar200.pth'
-load_checkpoint = final_result_name
-
 results_path = './results/pnasnet/'
-load_path = './results/pnasnet/'
+load_path = './results/pnasnet_mixup/'
 result_name = 'pnasnet.pth'
 final_result_name = 'pnasnet200.pth'
-load_checkpoint = 'pnasnet.pth'
+load_checkpoint = 'pnasnet_mixup.pth'
 
 # Model
 print('==> Building pnasnet model..')
@@ -89,7 +82,7 @@ if args.resume:
     # Load checkpoint.
     print('==> Resuming from checkpoint..')
     assert os.path.isdir(load_path), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load(load_path+result_name)
+    checkpoint = torch.load(load_path+load_checkpoint)
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
