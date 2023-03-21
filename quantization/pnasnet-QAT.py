@@ -61,9 +61,9 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
     
 # Model
-print('==> Building densenet_cifar model..')
+print('==> Building PNASNetB model..')
 
-net = densenet_cifar()
+net = PNASNetB()
 
 print("Number of parameters: ", count_parameters(net))
 train_acc_plot = []
@@ -74,11 +74,11 @@ lr_values_plot = []
 
 net = net.to(device)
 
-results_path = './../results/densenet_cifar_mixup_QAT/'
-load_path = './../results/densenet_cifar_mixup/'
-result_name = 'densenet_cifar_mixup_QAT.pth'
+results_path = './../results/pnasnet_QAT/'
+load_path = './../results/pnasnet_mixup/'
+result_name = 'pnasnet_QAT.pth'
 final_result_name = 'densenet_cifar200.pth'
-load_checkpoint = 'densenet_cifar_mixup.pth'
+load_checkpoint = 'pnasnet_mixup.pth'
 
 if args.resume:
     # Load checkpoint.
@@ -87,23 +87,17 @@ if args.resume:
     checkpoint = torch.load(load_path+load_checkpoint)
     net.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
-    start_epoch = checkpoint['epoch']
-    train_acc_plot = checkpoint['train acc']
-    train_loss_plot = checkpoint['train loss']
-    test_acc_plot = checkpoint['test acc']
-    test_loss_plot = checkpoint['test loss']
-    lr_values_plot = checkpoint['lr values']
     print("Best Acc: ", best_acc)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr,
                       momentum=0.9, weight_decay=5e-4)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
 
 # Training
 def train(epoch):
     print('\nEpoch: %d' % epoch)
-    net.train()
+    net.eval()
     train_loss = 0
     correct = 0
     total = 0
@@ -129,14 +123,14 @@ def train(epoch):
 
 def test(epoch):
     global best_acc
-    quantized_net.eval()
+    net.eval()
     test_loss = 0
     correct = 0
     total = 0
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
             # inputs, targets = inputs.to(device), targets.to(device)
-            outputs = quantized_net(inputs)
+            outputs = net(inputs)
             loss = criterion(outputs, targets)
             test_loss += loss.item()
             _, predicted = outputs.max(1)
@@ -148,43 +142,36 @@ def test(epoch):
 
     # Save checkpoint.
     acc = 100.*correct/total
-    if acc > 94.57:
-        print('Saving..')
-        state = {
-            'net': net.state_dict(),
-            'acc': acc,
-            'epoch': epoch,
-            'train loss': train_loss_plot,
-            'train acc': train_acc_plot,
-            'test loss': test_loss_plot,
-            'test acc': test_acc_plot,
-            'lr values': lr_values_plot
-        }
-        if not os.path.isdir(results_path):
-            os.mkdir(results_path)
-        torch.save(state, results_path+result_name)
+    print('Saving..')
+    state = {
+        'net': net.state_dict(),
+        'acc': acc,
+        'train loss': train_loss_plot,
+        'train acc': train_acc_plot,
+    }
+    if not os.path.isdir(results_path):
+        os.mkdir(results_path)
+    torch.save(state, results_path+result_name)
 
 # for epoch in range(start_epoch, start_epoch+200):
 #     train(epoch)
 #     test(epoch)
 #     scheduler.step()
+
+net.eval()
 net.fuse_model()
 print_size_of_model(net)
 
-net.qconfig = torch.quantization.get_default_qconfig('fbgemm')
+net.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
 print(net.qconfig)
+
 torch.quantization.prepare_qat(net, inplace=True)
 
-for nepoch in range(8):
-    net.to(device)
-    train(nepoch)
-    if nepoch > 3:
-        # Freeze quantizer parameters
-        net.apply(torch.quantization.disable_observer)
-    if nepoch > 2:
-        # Freeze batch norm mean and variance estimates
-        net.apply(torch.nn.intrinsic.qat.freeze_bn_stats)
-    # Check the accuracy after each epoch
-    net.to('cpu')
-    quantized_net = torch.quantization.convert(net.eval(), inplace=False)
-    test(nepoch)
+for epoch in range(10):
+    train(epoch)
+    scheduler.step()
+
+net.to('cpu')
+torch.quantization.convert(net, inplace=True)
+print_size_of_model(net)
+test(0)
